@@ -41,14 +41,14 @@ re_numeric_part = re.compile(r"^(\d+)")
 
 def numeric_part(s):
     """Returns the leading numeric part of a string.
-    
+
     >>> numeric_part("20-alpha")
     20
     >>> numeric_part("foo")
     >>> numeric_part("16b")
     16
     """
-    
+
     m = re_numeric_part.match(s)
     if m:
         return int(m.group(1))
@@ -60,7 +60,7 @@ class Connection(_mysql.connection):
     """MySQL Database Connection Object"""
 
     default_cursor = MySQLdb.cursors.Cursor
-    
+
     def __init__(self, *args, **kwargs):
         """
 
@@ -70,7 +70,7 @@ class Connection(_mysql.connection):
 
         host
           string, host to connect
-          
+
         user
           string, user to connect as
 
@@ -119,7 +119,7 @@ class Connection(_mysql.connection):
           If supplied, the session SQL mode will be changed to this
           setting (MySQL-4.1 and newer). For more details and legal
           values, see the MySQL documentation.
-          
+
         client_flag
           integer, flags to use or 0
           (see MySQL docs or constants/CLIENTS.py)
@@ -132,7 +132,7 @@ class Connection(_mysql.connection):
 
         local_infile
           integer, non-zero enables LOAD LOCAL INFILE; zero disables
-    
+
         There are a number of undocumented, non-standard methods. See the
         documentation for the MySQL C API for some hints on what they do.
 
@@ -140,11 +140,11 @@ class Connection(_mysql.connection):
         from .constants import CLIENT, FIELD_TYPE
         from .converters import conversions
         from weakref import proxy, WeakValueDictionary
-        
+
         import types
 
         kwargs2 = kwargs.copy()
-        
+
         if 'conv' in kwargs:
             conv = kwargs['conv']
         else:
@@ -161,6 +161,8 @@ class Connection(_mysql.connection):
         self.cursorclass = kwargs2.pop('cursorclass', self.default_cursor)
         charset = kwargs2.pop('charset', 'utf8')
 
+        # Keep semi-compatibility with old client. Everything is unicode now.
+        kwargs2.pop('use_unicode', '')
         sql_mode = kwargs2.pop('sql_mode', '')
 
         client_flag = kwargs.get('client_flag', 0)
@@ -169,14 +171,14 @@ class Connection(_mysql.connection):
             client_flag |= CLIENT.MULTI_STATEMENTS
         if client_version >= (5, 0):
             client_flag |= CLIENT.MULTI_RESULTS
-            
+
         kwargs2['client_flag'] = client_flag
 
         super(Connection, self).__init__(*args, **kwargs2)
 
         self.encoders = dict([ (k, v) for k, v in conv.items()
                                if type(k) is not int ])
-        
+
         self._server_version = tuple([ numeric_part(n) for n in self.get_server_info().split('.')[:2] ])
 
         db = proxy(self)
@@ -189,7 +191,7 @@ class Connection(_mysql.connection):
             def bytes_literal(u, dummy=None):
                 return db.literal(u.decode(bytes_literal.charset))
             return bytes_literal
-       
+
         string_literal = _get_string_literal()
         self.bytes_literal = bytes_literal = _get_bytes_literal()
         if not charset:
@@ -201,13 +203,13 @@ class Connection(_mysql.connection):
 
         self.encoders[str] = string_literal
         self.encoders[bytes] = bytes_literal
-        
+
         self._transactional = self.server_capabilities & CLIENT.TRANSACTIONS
         if self._transactional:
             # PEP-249 requires autocommit to be initially off
             self.autocommit(False)
         self.messages = []
-        
+
     def cursor(self, cursorclass=None):
         """
 
@@ -220,13 +222,13 @@ class Connection(_mysql.connection):
         return (cursorclass or self.cursorclass)(self)
 
     def __enter__(self): return self.cursor()
-    
+
     def __exit__(self, exc, value, tb):
         if exc:
             self.rollback()
         else:
             self.commit()
-            
+
     def literal(self, o):
         """
 
@@ -248,7 +250,7 @@ class Connection(_mysql.connection):
         warn("begin() is non-standard and will be removed in 1.3",
              DeprecationWarning, 2)
         self.query("BEGIN")
-        
+
     if not hasattr(_mysql.connection, 'warning_count'):
 
         def warning_count(self):
@@ -283,7 +285,7 @@ class Connection(_mysql.connection):
             raise NotSupportedError("server is too old to set sql_mode")
         self.query("SET SESSION sql_mode='{!s}'".format(sql_mode))
         self.store_result()
-        
+
     def show_warnings(self):
         """Return detailed information about warnings as a
         sequence of tuples of (Level, Code, Message). This
@@ -294,7 +296,7 @@ class Connection(_mysql.connection):
         r = self.store_result()
         warnings = r.fetch_row(0)
         return warnings
-    
+
     Warning = Warning
     Error = Error
     InterfaceError = InterfaceError
